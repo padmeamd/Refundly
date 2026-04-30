@@ -29,6 +29,7 @@ export function seedMockTransactions(): RawTransaction[] {
     { id: "tx-trainline-1", date: "2026-04-05", merchant: "Trainline", amount: 56.2, currency: "GBP", description: "Cancelled booking no refund", recurring: false },
     { id: "tx-stream-1", date: "2026-04-20", merchant: "StreamingPlus", amount: 19.99, currency: "GBP", description: "STREAMINGPLUS*UK", recurring: true },
     { id: "tx-stream-2", date: "2026-03-20", merchant: "StreamingPlus", amount: 19.99, currency: "GBP", description: "STREAMINGPLUS*UK", recurring: true },
+    { id: "tx-hotel-1", date: "2026-03-28", merchant: "HotelBreaks.co.uk", amount: 155, currency: "GBP", description: "Hotel booking - non-refundable", recurring: false },
     { id: "tx-tesco-1", date: "2026-04-24", merchant: "Tesco", amount: 42.5, currency: "GBP", description: "Groceries", recurring: false },
     { id: "tx-salary-1", date: "2026-04-25", merchant: "Acme Payroll", amount: -3200, currency: "GBP", description: "Salary incoming", recurring: true },
   ];

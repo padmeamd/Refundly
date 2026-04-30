@@ -144,7 +144,7 @@ export function detectSuspiciousRecurring(transactions: RawTransaction[]): Recov
   const recurring = transactions.filter((t) => t.recurring && t.merchant.toLowerCase().includes("streamingplus"));
   if (recurring.length < 2) return [];
   return [
-    createOpportunity("SUSPICIOUS_RECURRING", recurring[0].merchant, recurring.reduce((s, t) => s + t.amount, 0), recurring[0].amount, 67, [
+    createOpportunity("SUSPICIOUS_RECURRING", recurring[0].merchant, recurring[0].amount, recurring[0].amount, 67, [
       `${recurring.length} recurring charges detected`,
       "Descriptor appears unrecognized",
       "No signup proof in linked data sources (mocked)",

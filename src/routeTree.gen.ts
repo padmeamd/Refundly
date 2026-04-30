@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReportRouteImport } from './routes/report'
 import { Route as FindingsRouteImport } from './routes/findings'
+import { Route as DemoRouteImport } from './routes/demo'
 import { Route as ActionsRouteImport } from './routes/actions'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FindingsCaseIdRouteImport } from './routes/findings.$caseId'
@@ -23,6 +24,11 @@ const ReportRoute = ReportRouteImport.update({
 const FindingsRoute = FindingsRouteImport.update({
   id: '/findings',
   path: '/findings',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DemoRoute = DemoRouteImport.update({
+  id: '/demo',
+  path: '/demo',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ActionsRoute = ActionsRouteImport.update({
@@ -44,6 +50,7 @@ const FindingsCaseIdRoute = FindingsCaseIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
+  '/demo': typeof DemoRoute
   '/findings': typeof FindingsRouteWithChildren
   '/report': typeof ReportRoute
   '/findings/$caseId': typeof FindingsCaseIdRoute
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
+  '/demo': typeof DemoRoute
   '/findings': typeof FindingsRouteWithChildren
   '/report': typeof ReportRoute
   '/findings/$caseId': typeof FindingsCaseIdRoute
@@ -59,19 +67,27 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/actions': typeof ActionsRoute
+  '/demo': typeof DemoRoute
   '/findings': typeof FindingsRouteWithChildren
   '/report': typeof ReportRoute
   '/findings/$caseId': typeof FindingsCaseIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/actions' | '/findings' | '/report' | '/findings/$caseId'
+  fullPaths:
+    | '/'
+    | '/actions'
+    | '/demo'
+    | '/findings'
+    | '/report'
+    | '/findings/$caseId'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/actions' | '/findings' | '/report' | '/findings/$caseId'
+  to: '/' | '/actions' | '/demo' | '/findings' | '/report' | '/findings/$caseId'
   id:
     | '__root__'
     | '/'
     | '/actions'
+    | '/demo'
     | '/findings'
     | '/report'
     | '/findings/$caseId'
@@ -80,6 +96,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActionsRoute: typeof ActionsRoute
+  DemoRoute: typeof DemoRoute
   FindingsRoute: typeof FindingsRouteWithChildren
   ReportRoute: typeof ReportRoute
 }
@@ -98,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/findings'
       fullPath: '/findings'
       preLoaderRoute: typeof FindingsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/demo': {
+      id: '/demo'
+      path: '/demo'
+      fullPath: '/demo'
+      preLoaderRoute: typeof DemoRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/actions': {
@@ -139,6 +163,7 @@ const FindingsRouteWithChildren = FindingsRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ActionsRoute: ActionsRoute,
+  DemoRoute: DemoRoute,
   FindingsRoute: FindingsRouteWithChildren,
   ReportRoute: ReportRoute,
 }

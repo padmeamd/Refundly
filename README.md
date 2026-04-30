@@ -2,6 +2,8 @@
 
 Refundly scans transactions, finds lost money, decides whether to act automatically or request approval, prepares actions, and logs everything in an audit trail.
 
+Refundly is not a budgeting app. It is an autonomous financial intelligence agent that turns transaction history into recovery actions.
+
 ## Problem
 
 People lose money to duplicate charges, hidden fees, unused subscriptions, and missed refunds, but recovery work is manual and slow.
@@ -50,6 +52,10 @@ Services:
 5. Decision reason + confidence are shown
 6. One auto-ready action is submitted
 7. Report shows summary metrics and audit timeline
+
+## Demo note
+
+This hackathon MVP uses simulated Open Banking transaction data. In production, this would connect to Open Banking providers such as Plaid, TrueLayer, or Tink. The detection, confidence scoring, HITL routing, action generation, and audit trail are implemented as the core workflow.
 
 ## Why this fits the hackathon rubric
 

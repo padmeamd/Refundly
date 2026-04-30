@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { apiRunScan, runDemo } from "@/lib/api/apiClient";
+import { apiRunScan } from "@/lib/api/apiClient";
 
 export const Route = createFileRoute("/")({
   component: Dashboard,
@@ -9,7 +9,6 @@ export const Route = createFileRoute("/")({
 function Dashboard() {
   const navigate = useNavigate();
   const [scanning, setScanning] = useState(false);
-  const [demoSteps, setDemoSteps] = useState<string[]>([]);
   const [runMeta, setRunMeta] = useState({ runId: "-", auditHash: "-", actionsCreated: 0, actionsSubmitted: 0, transactionsScanned: 0, findingsDetected: 0 });
   const [summary, setSummary] = useState({
     totalMoneyFound: 0,
@@ -35,37 +34,21 @@ function Dashboard() {
     setScanning(false);
   };
 
-  const runDemoMode = async () => {
-    setScanning(true);
-    const res = await runDemo();
-    if (res.ok) {
-      setSummary(res.data.summary);
-      setDemoSteps(res.data.steps);
-      setRunMeta({
-        runId: res.data.runId,
-        auditHash: res.data.auditHash,
-        actionsCreated: res.data.actionsCreated,
-        actionsSubmitted: res.data.actionsSubmitted,
-        transactionsScanned: res.data.summary.numberOfOpportunities + 4,
-        findingsDetected: res.data.summary.numberOfOpportunities,
-      });
-      navigate({ to: "/report" });
-    }
-    setScanning(false);
-  };
-
   return (
     <div className="px-6 py-10 max-w-5xl mx-auto">
       <h1 className="text-4xl font-semibold">Refundly Autonomous Recovery Agent</h1>
       <p className="mt-2 text-muted-foreground">
         Scan transactions, detect recoverable losses, decide automation, generate actions, and log full audit evidence.
       </p>
+      <p className="mt-2 inline-flex rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+        Using simulated Open Banking transaction data for hackathon demo
+      </p>
       <div className="mt-6 flex gap-3">
+        <Link to="/demo" className="rounded-lg bg-primary text-primary-foreground px-5 py-3 text-base font-semibold">
+          Run 90-sec Demo
+        </Link>
         <button onClick={runScan} disabled={scanning} className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm">
           {scanning ? "Running..." : "Run Recovery Scan"}
-        </button>
-        <button onClick={runDemoMode} disabled={scanning} className="rounded-lg border border-border px-4 py-2 text-sm">
-          Run 90-sec demo
         </button>
         <Link to="/findings" className="rounded-lg border border-border px-4 py-2 text-sm">
           View Findings
@@ -93,16 +76,17 @@ function Dashboard() {
         </div>
       </div>
 
-      {demoSteps.length > 0 && (
-        <div className="mt-6 rounded-xl border border-border p-4">
-          <h3 className="font-medium mb-2">Demo Progress</h3>
-          <ol className="space-y-1 text-sm text-muted-foreground">
-            {demoSteps.map((s) => (
-              <li key={s}>• {s}</li>
-            ))}
-          </ol>
-        </div>
-      )}
+      <section className="mt-8 rounded-xl border border-border p-4">
+        <h3 className="font-semibold">How it works</h3>
+        <ol className="mt-2 text-sm text-muted-foreground space-y-1">
+          <li>1. Connect transaction feed</li>
+          <li>2. Detect recoverable money</li>
+          <li>3. Score confidence</li>
+          <li>4. Decide auto vs human review</li>
+          <li>5. Generate recovery action</li>
+          <li>6. Log audit trail</li>
+        </ol>
+      </section>
     </div>
   );
 }

@@ -113,10 +113,13 @@ export async function apiGetOpportunities(): Promise<ApiResponse<RecoveryOpportu
 export async function apiGetOpportunity(id: string): Promise<ApiResponse<RecoveryOpportunity & { merchantIntelligence: ReturnType<typeof getMerchantIntelligence>; timeline: AuditEntry[] }>> {
   const opp = latestOpportunities.find((o) => o.id === id);
   if (!opp) return err(`Opportunity "${id}" not found`);
+  const action = listActions().find((a) => a.opportunityId === id);
   return ok({
     ...opp,
     merchantIntelligence: getMerchantIntelligence(opp.merchant),
     timeline: getAuditTimeline(opp.id),
+    recoveryMessage: action?.payload.body ?? "",
+    actionStatus: action?.status ?? "DRAFTED",
   });
 }
 
@@ -254,8 +257,8 @@ export async function runDemo(): Promise<ApiResponse<DemoState>> {
     highlightedOpportunityId: highest?.id,
     submittedOpportunityId,
     summary: latestSummary,
-    runId: `run-${Date.now()}`,
-    auditHash: simpleHash(getAuditTrail().map((a) => a.id).join("|")),
+    runId: "RFND-042",
+    auditHash: "RFND-2026-04-30-A9F2",
     actionsCreated: listActions().length,
     actionsSubmitted: listActions().filter((a) => a.status === "SUBMITTED").length,
   });

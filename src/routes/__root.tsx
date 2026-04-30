@@ -1,10 +1,11 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useLocation } from "@tanstack/react-router";
-import { Radar, LayoutDashboard, ListChecks, Zap, FileBarChart, Sparkles } from "lucide-react";
+import { Radar, LayoutDashboard, ListChecks, Zap, FileBarChart, Sparkles, PlayCircle } from "lucide-react";
 import appCss from "../styles.css?url";
 import { CoinBurst } from "../components/CoinBurst";
 
-const nav: { to: "/" | "/findings" | "/actions" | "/report"; label: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
+const nav: { to: "/" | "/demo" | "/findings" | "/actions" | "/report"; label: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
+  { to: "/demo", label: "Demo", icon: PlayCircle },
   { to: "/findings", label: "Findings", icon: ListChecks },
   { to: "/actions", label: "Action Center", icon: Zap },
   { to: "/report", label: "Report", icon: FileBarChart },
