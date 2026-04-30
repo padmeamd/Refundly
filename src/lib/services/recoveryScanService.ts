@@ -1,4 +1,5 @@
 import type { RawTransaction } from "./transactionService";
+import { getDemoModeEnabled } from "@/lib/demo-mode";
 
 export type RecoveryCategory =
   | "DUPLICATE_CHARGE"
@@ -52,6 +53,7 @@ export function decideAutomation(opportunity: Pick<RecoveryOpportunity, "confide
 }
 
 export function runRecoveryScan(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  if (!getDemoModeEnabled()) return [];
   const opportunities: RecoveryOpportunity[] = [];
   const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
   opportunities.push(...detectDuplicateCharges(sorted));

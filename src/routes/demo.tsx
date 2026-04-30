@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { apiGetAuditLog, apiGetOpportunity, apiGetOpportunities, apiRunScan, apiSubmitOpportunity, runDemo } from "@/lib/api/apiClient";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useDemoMode } from "@/lib/state/DemoModeContext";
 
 export const Route = createFileRoute("/demo")({
   component: DemoRoute,
@@ -20,6 +21,7 @@ const DEMO_STEPS = [
 ];
 
 function DemoRoute() {
+  const { demoMode } = useDemoMode();
   const [running, setRunning] = useState(false);
   const [step, setStep] = useState(0);
   const [finished, setFinished] = useState(false);
@@ -37,6 +39,7 @@ function DemoRoute() {
   }, [selectedCaseId]);
 
   const startDemo = async () => {
+    if (!demoMode) return;
     setRunning(true);
     setFinished(false);
     setStep(0);
@@ -114,7 +117,15 @@ function DemoRoute() {
   return (
     <div className="px-6 py-8 max-w-6xl mx-auto">
       <h1 className="text-3xl font-semibold">Run 90-sec Demo</h1>
-      <p className="text-sm text-muted-foreground mt-2">Using simulated Open Banking transaction data for hackathon demo.</p>
+      <p className="text-sm text-muted-foreground mt-2">
+        {demoMode ? "Using simulated Open Banking transaction data for hackathon demo." : "No data connected."}
+      </p>
+
+      {!demoMode && (
+        <div className="mt-4 rounded-xl border border-border bg-muted/30 p-4 text-sm text-muted-foreground">
+          Connect your account to start scanning
+        </div>
+      )}
 
       <div className="mt-4 rounded-xl border border-border p-4">
         <div className="flex items-center justify-between text-sm">
@@ -125,7 +136,7 @@ function DemoRoute() {
           <div className="h-full bg-gradient-primary" style={{ width: `${progress}%` }} />
         </div>
         <div className="mt-4 flex gap-2">
-          <button onClick={startDemo} className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold">
+          <button onClick={startDemo} disabled={!demoMode} className="rounded-lg bg-primary text-primary-foreground px-4 py-2 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed">
             Run 90-sec Demo
           </button>
           <button onClick={nextStep} disabled={!running || finished} className="rounded-lg border border-border px-4 py-2 text-sm">

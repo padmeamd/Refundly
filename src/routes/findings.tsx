@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { apiGetOpportunities } from "@/lib/api/apiClient";
 import type { AutomationDecision, RecoveryOpportunity } from "@/lib/services/recoveryScanService";
 import { StatusBadge } from "@/components/StatusBadge";
+import { useDemoMode } from "@/lib/state/DemoModeContext";
 
 export const Route = createFileRoute("/findings")({
   component: FindingsPage,
@@ -18,6 +19,7 @@ const FILTERS: { key: Filter; label: string; icon: string }[] = [
 ];
 
 function FindingsPage() {
+  const { demoMode } = useDemoMode();
   const [filter, setFilter] = useState<Filter>("All");
   const [findings, setFindings] = useState<RecoveryOpportunity[]>([]);
   useEffect(() => {
@@ -37,6 +39,11 @@ function FindingsPage() {
         <p className="mt-2 text-muted-foreground max-w-2xl">
           Each case triaged with evidence, confidence score, merchant intelligence, and an autonomous routing decision.
         </p>
+        {!demoMode && (
+          <p className="mt-3 inline-flex rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+            Connect your account to start scanning
+          </p>
+        )}
       </div>
 
       {/* Filter tabs */}
@@ -75,7 +82,11 @@ function FindingsPage() {
           <div className="text-right">Case</div>
         </div>
 
-        {filtered.map((f) => (
+        {filtered.length === 0 ? (
+          <div className="px-5 py-8 text-sm text-muted-foreground">
+            {demoMode ? "Run scan to populate findings." : "Connect your account to start scanning"}
+          </div>
+        ) : filtered.map((f) => (
           <div
             key={f.id}
             className={`grid grid-cols-1 md:grid-cols-[1.2fr_1fr_0.6fr_0.7fr_0.6fr_1.1fr_0.8fr] gap-3 px-5 py-4 border-b border-border last:border-0 transition-colors ${

@@ -3,12 +3,14 @@ import { useEffect, useState } from "react";
 import { Download } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { apiGetAuditLog, apiGetOpportunities, apiGetReport } from "@/lib/api/apiClient";
+import { useDemoMode } from "@/lib/state/DemoModeContext";
 
 export const Route = createFileRoute("/report")({
   component: ReportPage,
 });
 
 function ReportPage() {
+  const { demoMode } = useDemoMode();
   const [report, setReport] = useState<any>(null);
   const [opps, setOpps] = useState<any[]>([]);
   const [audit, setAudit] = useState<any[]>([]);
@@ -58,13 +60,22 @@ function ReportPage() {
   return (
     <div className="px-6 md:px-10 py-8 md:py-12 max-w-5xl mx-auto">
       <section className="rounded-2xl border border-primary/30 bg-primary/5 p-6 mb-6">
-        <h2 className="text-2xl font-semibold">Refundly found £420 in lost money and prepared £180 in recovery actions.</h2>
+        <h2 className="text-2xl font-semibold">
+          {demoMode
+            ? "Refundly found £420 in lost money and prepared £180 in recovery actions."
+            : "Connect your account to start scanning."}
+        </h2>
         <p className="text-sm text-muted-foreground mt-2">
           Live run: £{report.totalMoneyFound.toFixed(2)} found, £{report.recoverableNow.toFixed(2)} recoverable.
         </p>
       </section>
       <h1 className="text-3xl font-semibold">Recovery Report</h1>
       <p className="mt-2 text-muted-foreground">This report is generated from the service layer and audit log.</p>
+      {!demoMode && (
+        <p className="mt-3 inline-flex rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+          Connect your account to start scanning
+        </p>
+      )}
       <div className="mt-4 flex gap-3">
         <button onClick={handleExport} className="inline-flex items-center gap-2 rounded-xl bg-gradient-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-glow">
           <Download className="h-4 w-4" /> Export Recovery Report

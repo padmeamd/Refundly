@@ -1,6 +1,7 @@
 import { approveAction, createAction, ignoreAction, listActions, markRecovered, submitAction, type RecoveryAction } from "./actionService";
 import { clearAuditTrail, getAuditTimeline, getAuditTrail, logEvent, type AuditEntry } from "./auditService";
 import { explainOpportunity, generateRecoveryMessage } from "./llmService";
+import { getDemoModeEnabled } from "@/lib/demo-mode";
 import { getMerchantIntelligence } from "./merchantIntelligence";
 import { computeSummary, runRecoveryScan, type RecoveryOpportunity, type ScanSummary } from "./recoveryScanService";
 import { getTransactions, seedMockTransactions, type RawTransaction, type TransactionPage } from "./transactionService";
@@ -45,7 +46,7 @@ let latestSummary: ScanSummary = {
 
 export async function apiGetTransactions(): Promise<ApiResponse<TransactionPage>> {
   try {
-    seedMockTransactions();
+    if (getDemoModeEnabled()) seedMockTransactions();
     const data = await getTransactions();
     latestTransactions = data.transactions;
     return ok(data);
@@ -69,6 +70,23 @@ export interface ScanResult {
 
 export async function apiRunScan(): Promise<ApiResponse<ScanResult>> {
   clearAuditTrail();
+  if (!getDemoModeEnabled()) {
+    latestTransactions = [];
+    latestOpportunities = [];
+    latestSummary = computeSummary([]);
+    return ok({
+      scanId: `scan-${Date.now()}`,
+      steps: scanSteps,
+      opportunitiesCount: 0,
+      autoReadyCount: 0,
+      needsApprovalCount: 0,
+      notWorthCount: 0,
+      totalMoneyFound: 0,
+      recoverableNow: 0,
+      summary: latestSummary,
+      completedAt: new Date().toISOString(),
+    });
+  }
   if (!latestTransactions.length) {
     const tx = await getTransactions();
     latestTransactions = tx.transactions;
@@ -107,10 +125,12 @@ export async function apiRunScan(): Promise<ApiResponse<ScanResult>> {
 }
 
 export async function apiGetOpportunities(): Promise<ApiResponse<RecoveryOpportunity[]>> {
+  if (!getDemoModeEnabled()) return ok([]);
   return ok(latestOpportunities);
 }
 
 export async function apiGetOpportunity(id: string): Promise<ApiResponse<RecoveryOpportunity & { merchantIntelligence: ReturnType<typeof getMerchantIntelligence>; timeline: AuditEntry[] }>> {
+  if (!getDemoModeEnabled()) return err(`Opportunity "${id}" not found`);
   const opp = latestOpportunities.find((o) => o.id === id);
   if (!opp) return err(`Opportunity "${id}" not found`);
   const action = listActions().find((a) => a.opportunityId === id);
@@ -124,6 +144,7 @@ export async function apiGetOpportunity(id: string): Promise<ApiResponse<Recover
 }
 
 export async function apiSubmitOpportunity(id: string): Promise<ApiResponse<RecoveryAction>> {
+  if (!getDemoModeEnabled()) return err("No data connected");
   try {
     const opportunity = latestOpportunities.find((o) => o.id === id);
     if (!opportunity) return err(`Opportunity "${id}" not found`);
@@ -142,6 +163,7 @@ export async function apiSubmitOpportunity(id: string): Promise<ApiResponse<Reco
 }
 
 export async function apiIgnoreOpportunity(id: string): Promise<ApiResponse<{ ignored: true }>> {
+  if (!getDemoModeEnabled()) return ok({ ignored: true });
   const opportunity = latestOpportunities.find((o) => o.id === id);
   if (!opportunity) return err(`Opportunity "${id}" not found`);
   await ignoreAction(id);
@@ -156,6 +178,7 @@ export async function apiIgnoreOpportunity(id: string): Promise<ApiResponse<{ ig
 }
 
 export async function apiMarkRecovered(id: string): Promise<ApiResponse<RecoveryAction>> {
+  if (!getDemoModeEnabled()) return err("No data connected");
   try {
     const opportunity = latestOpportunities.find((o) => o.id === id);
     if (!opportunity) return err(`Opportunity "${id}" not found`);
@@ -174,6 +197,7 @@ export async function apiMarkRecovered(id: string): Promise<ApiResponse<Recovery
 }
 
 export async function apiGetAuditLog(): Promise<ApiResponse<AuditEntry[]>> {
+  if (!getDemoModeEnabled()) return ok([]);
   return ok(getAuditTrail());
 }
 
@@ -191,6 +215,20 @@ export interface ReportSummary {
 }
 
 export async function apiGetReport(): Promise<ApiResponse<ReportSummary>> {
+  if (!getDemoModeEnabled()) {
+    return ok({
+      totalMoneyFound: 0,
+      recoverableNow: 0,
+      numberOfOpportunities: 0,
+      autoReadyCount: 0,
+      needsApprovalCount: 0,
+      notWorthCount: 0,
+      autoReadyAmount: 0,
+      needsApprovalAmount: 0,
+      ignoredAmount: 0,
+      generatedAt: new Date().toISOString(),
+    });
+  }
   const report: ReportSummary = {
     totalMoneyFound: latestSummary.totalMoneyFound,
     recoverableNow: latestSummary.recoverableNow,
@@ -207,10 +245,12 @@ export async function apiGetReport(): Promise<ApiResponse<ReportSummary>> {
 }
 
 export async function apiGetActions(): Promise<ApiResponse<RecoveryAction[]>> {
+  if (!getDemoModeEnabled()) return ok([]);
   return ok(listActions());
 }
 
 export async function apiApproveOpportunity(id: string): Promise<ApiResponse<RecoveryAction>> {
+  if (!getDemoModeEnabled()) return err("No data connected");
   const opportunity = latestOpportunities.find((o) => o.id === id);
   if (!opportunity) return err(`Opportunity "${id}" not found`);
   const action = await approveAction(id);
@@ -235,6 +275,22 @@ export interface DemoState {
 }
 
 export async function runDemo(): Promise<ApiResponse<DemoState>> {
+  if (!getDemoModeEnabled()) {
+    latestTransactions = [];
+    latestOpportunities = [];
+    latestSummary = computeSummary([]);
+    clearAuditTrail();
+    return ok({
+      steps: ["Demo mode is OFF"],
+      highlightedOpportunityId: undefined,
+      submittedOpportunityId: undefined,
+      summary: latestSummary,
+      runId: "-",
+      auditHash: "-",
+      actionsCreated: 0,
+      actionsSubmitted: 0,
+    });
+  }
   await apiGetTransactions();
   await apiRunScan();
   const highest = [...latestOpportunities].sort((a, b) => b.recoverableAmount - a.recoverableAmount)[0];

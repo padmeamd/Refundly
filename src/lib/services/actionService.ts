@@ -1,4 +1,5 @@
 import type { AutomationDecision, RecoveryOpportunity } from "./recoveryScanService";
+import { getDemoModeEnabled } from "@/lib/demo-mode";
 
 export type ActionType = "REFUND_EMAIL" | "BANK_DISPUTE" | "SUBSCRIPTION_CANCEL" | "FEE_REVERSAL";
 export type ActionStatus = "DRAFTED" | "READY" | "NEEDS_APPROVAL" | "SUBMITTED" | "RECOVERED" | "IGNORED";
@@ -23,6 +24,9 @@ const STORAGE_KEY = "refundly-actions";
 loadFromStorage();
 
 export async function createAction(opportunity: RecoveryOpportunity, message: string): Promise<RecoveryAction> {
+  if (!getDemoModeEnabled()) {
+    return createPlaceholderAction(opportunity.id, opportunity.merchant);
+  }
   const existing = actionStore.get(opportunity.id);
   if (existing) return existing;
 
@@ -51,6 +55,7 @@ export async function createAction(opportunity: RecoveryOpportunity, message: st
 }
 
 export async function submitAction(opportunityId: string): Promise<RecoveryAction> {
+  if (!getDemoModeEnabled()) return createPlaceholderAction(opportunityId, "No data connected");
   const action = mustGet(opportunityId);
   if (action.status !== "READY" && action.status !== "NEEDS_APPROVAL" && action.status !== "DRAFTED") {
     throw new Error(`Action ${opportunityId} is not submittable from status ${action.status}`);
@@ -64,6 +69,7 @@ export async function submitAction(opportunityId: string): Promise<RecoveryActio
 }
 
 export async function markRecovered(opportunityId: string): Promise<RecoveryAction> {
+  if (!getDemoModeEnabled()) return createPlaceholderAction(opportunityId, "No data connected");
   const action = mustGet(opportunityId);
   await wait(180);
   action.status = "RECOVERED";
@@ -74,6 +80,7 @@ export async function markRecovered(opportunityId: string): Promise<RecoveryActi
 }
 
 export async function approveAction(opportunityId: string): Promise<RecoveryAction> {
+  if (!getDemoModeEnabled()) return createPlaceholderAction(opportunityId, "No data connected");
   const action = mustGet(opportunityId);
   await wait(120);
   action.status = "READY";
@@ -83,6 +90,7 @@ export async function approveAction(opportunityId: string): Promise<RecoveryActi
 }
 
 export async function ignoreAction(opportunityId: string): Promise<RecoveryAction> {
+  if (!getDemoModeEnabled()) return createPlaceholderAction(opportunityId, "No data connected");
   const action = mustGet(opportunityId);
   await wait(80);
   action.status = "IGNORED";
@@ -96,6 +104,7 @@ export function getAction(opportunityId: string): RecoveryAction | undefined {
 }
 
 export function listActions(): RecoveryAction[] {
+  if (!getDemoModeEnabled()) return [];
   return Array.from(actionStore.values());
 }
 
@@ -121,6 +130,23 @@ function mustGet(id: string): RecoveryAction {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createPlaceholderAction(opportunityId: string, merchant: string): RecoveryAction {
+  return {
+    id: `act-${opportunityId}`,
+    opportunityId,
+    merchant,
+    actionType: "REFUND_EMAIL",
+    status: "DRAFTED",
+    amount: 0,
+    decision: "NOT_WORTH",
+    payload: {
+      subject: "No demo action available",
+      body: "Connect your account to start scanning.",
+    },
+    createdAt: new Date().toISOString(),
+  };
 }
 
 function persist() {

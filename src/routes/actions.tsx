@@ -1,15 +1,18 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
+import { Users, Zap } from "lucide-react";
 import { StatusBadge } from "@/components/StatusBadge";
 import { apiGetActions, apiGetOpportunities } from "@/lib/api/apiClient";
 import type { RecoveryAction } from "@/lib/services/actionService";
 import type { RecoveryOpportunity } from "@/lib/services/recoveryScanService";
+import { useDemoMode } from "@/lib/state/DemoModeContext";
 
 export const Route = createFileRoute("/actions")({
   component: ActionsPage,
 });
 
 function ActionsPage() {
+  const { demoMode } = useDemoMode();
   const [actions, setActions] = useState<RecoveryAction[]>([]);
   const [opps, setOpps] = useState<RecoveryOpportunity[]>([]);
   useEffect(() => {
@@ -29,6 +32,11 @@ function ActionsPage() {
         <p className="mt-2 text-muted-foreground max-w-2xl">
           The agent has decided which actions to auto-send and which require your approval based on confidence thresholds and amount limits.
         </p>
+        {!demoMode && (
+          <p className="mt-3 inline-flex rounded-full border border-border px-3 py-1 text-xs text-muted-foreground">
+            Connect your account to start scanning
+          </p>
+        )}
       </div>
 
       <section className="mb-8">

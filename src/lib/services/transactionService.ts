@@ -1,3 +1,5 @@
+import { getDemoModeEnabled } from "@/lib/demo-mode";
+
 export interface RawTransaction {
   id: string;
   date: string;
@@ -37,6 +39,13 @@ export function seedMockTransactions(): RawTransaction[] {
 }
 
 export async function getTransactions(): Promise<TransactionPage> {
+  if (!getDemoModeEnabled()) {
+    return {
+      transactions: [],
+      total: 0,
+      scannedAt: new Date().toISOString(),
+    };
+  }
   if (!TRANSACTIONS.length) seedMockTransactions();
   await new Promise((r) => setTimeout(r, 120));
   return {

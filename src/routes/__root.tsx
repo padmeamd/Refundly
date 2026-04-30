@@ -1,7 +1,8 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useLocation } from "@tanstack/react-router";
-import { Radar, LayoutDashboard, ListChecks, Zap, FileBarChart, Sparkles, PlayCircle } from "lucide-react";
+import { Radar, LayoutDashboard, ListChecks, Zap, FileBarChart, PlayCircle } from "lucide-react";
 import appCss from "../styles.css?url";
 import { CoinBurst } from "../components/CoinBurst";
+import { DemoModeProvider, useDemoMode } from "@/lib/state/DemoModeContext";
 
 const nav: { to: "/" | "/demo" | "/findings" | "/actions" | "/report"; label: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -61,13 +62,22 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function RootComponent() {
+  return (
+    <DemoModeProvider>
+      <RootLayout />
+    </DemoModeProvider>
+  );
+}
+
+function RootLayout() {
   const location = useLocation();
+  const { demoMode, toggleDemoMode } = useDemoMode();
   return (
     <div className="min-h-screen">
       <CoinBurst />
       {/* Top nav — single floating bar across the top */}
       <header className="sticky top-0 z-30 px-4 md:px-8 pt-4">
-        <div className="mx-auto max-w-7xl glass ring-frame rounded-full pl-3 pr-2 py-2 flex items-center gap-2">
+        <div className="mx-auto max-w-6xl glass ring-frame rounded-2xl pl-3 pr-3 py-2 flex items-center gap-2">
           <Link to="/" className="flex items-center gap-2.5 pl-2 pr-3 group">
             <div className="relative h-9 w-9 rounded-full bg-gradient-ink flex items-center justify-center shadow-soft">
               <Radar className="h-4.5 w-4.5 text-primary-foreground" strokeWidth={2.5} />
@@ -79,7 +89,7 @@ function RootComponent() {
             </div>
           </Link>
 
-          <nav className="ml-auto flex items-center gap-0.5">
+          <nav className="ml-auto flex items-center gap-1.5">
             {nav.map((item) => {
               const active = item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
               const Icon = item.icon;
@@ -87,7 +97,7 @@ function RootComponent() {
                 <Link
                   key={item.to}
                   to={item.to}
-                  className={`relative flex items-center gap-2 rounded-full px-3 md:px-4 py-2 text-[13px] transition-all ${
+                  className={`relative flex items-center gap-2 rounded-full px-3 md:px-3.5 py-1.5 text-[13px] transition-all ${
                     active
                       ? "bg-primary text-primary-foreground shadow-soft"
                       : "text-foreground/70 hover:text-foreground hover:bg-secondary/60"
@@ -100,9 +110,15 @@ function RootComponent() {
             })}
           </nav>
 
-          <div className="hidden md:flex ml-1 items-center gap-1.5 rounded-full bg-accent/30 border border-accent/40 pl-2.5 pr-3 py-1.5 text-[11px] font-medium">
-            <Sparkles className="h-3 w-3 text-primary" />
-            Live agent
+          <div className="hidden md:flex ml-2">
+            <button
+              onClick={toggleDemoMode}
+              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors ${
+                demoMode ? "bg-primary text-primary-foreground hover:bg-primary/90" : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+              }`}
+            >
+              Demo Mode: {demoMode ? "ON" : "OFF"}
+            </button>
           </div>
         </div>
       </header>
@@ -111,7 +127,7 @@ function RootComponent() {
         <Outlet />
       </main>
 
-      <footer className="px-6 md:px-10 pb-10 pt-16 max-w-7xl mx-auto">
+      <footer className="px-6 md:px-8 pb-10 pt-16 max-w-6xl mx-auto">
         <div className="border-t border-border pt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <div className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
