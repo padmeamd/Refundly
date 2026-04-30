@@ -1,6 +1,7 @@
 import { Outlet, Link, createRootRoute, HeadContent, Scripts, useLocation } from "@tanstack/react-router";
 import { Radar, LayoutDashboard, ListChecks, Zap, FileBarChart, Sparkles } from "lucide-react";
 import appCss from "../styles.css?url";
+import { CoinBurst } from "../components/CoinBurst";
 
 const nav: { to: "/" | "/findings" | "/actions" | "/report"; label: string; icon: typeof LayoutDashboard; exact?: boolean }[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, exact: true },
@@ -61,6 +62,7 @@ function RootComponent() {
   const location = useLocation();
   return (
     <div className="min-h-screen">
+      <CoinBurst />
       {/* Top nav — single floating bar across the top */}
       <header className="sticky top-0 z-30 px-4 md:px-8 pt-4">
         <div className="mx-auto max-w-7xl glass ring-frame rounded-full pl-3 pr-2 py-2 flex items-center gap-2">
