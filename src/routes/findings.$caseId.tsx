@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { findings } from "@/lib/mock-data";
+import { useEffect, useState } from "react";
 import { StatusBadge, HitlBadge } from "@/components/StatusBadge";
-import { X, Send, Check, EyeOff, FileText, Brain, Shield, TrendingUp, AlertTriangle, Sparkles } from "lucide-react";
+import { X, Send, Check, EyeOff } from "lucide-react";
+import { apiGetOpportunity, apiIgnoreOpportunity, apiMarkRecovered, apiSubmitOpportunity } from "@/lib/api/apiClient";
 
 export const Route = createFileRoute("/findings/$caseId")({
   component: CaseModal,
@@ -11,9 +11,14 @@ export const Route = createFileRoute("/findings/$caseId")({
 function CaseModal() {
   const { caseId } = Route.useParams();
   const navigate = useNavigate();
-  const f = findings.find((x) => x.id === caseId);
+  const [f, setF] = useState<any>(null);
   const [submitted, setSubmitted] = useState(false);
   const [recovered, setRecovered] = useState(false);
+  useEffect(() => {
+    apiGetOpportunity(caseId).then((res) => {
+      if (res.ok) setF(res.data);
+    });
+  }, [caseId]);
 
   const close = () => navigate({ to: "/findings" });
 
@@ -28,15 +33,9 @@ function CaseModal() {
     );
   }
 
-  const isNotPursuing = f.automationDecision === "NOT_WORTH_PURSUING";
-  const isAutoReady = f.automationDecision === "AUTO_READY";
-  const needsReview = f.automationDecision === "NEEDS_HUMAN_REVIEW";
-
-  const disputeFriendlinessColor = {
-    High: "text-primary",
-    Medium: "text-warning",
-    Low: "text-destructive",
-  }[f.merchantIntel.disputeFriendliness];
+  const isNotPursuing = f.decision === "NOT_WORTH";
+  const isAutoReady = f.decision === "AUTO_READY";
+  const needsReview = f.decision === "NEEDS_APPROVAL";
 
   return (
     <div
@@ -58,30 +57,30 @@ function CaseModal() {
 
         {/* Header */}
         <div className="p-6 md:p-8 border-b border-border">
-          <StatusBadge status={f.type} />
+          <StatusBadge status={f.category} />
           <h2 className="mt-3 text-2xl md:text-3xl font-semibold tracking-tight">{f.merchant}</h2>
-          <div className="text-sm text-muted-foreground mt-1">{f.category} · {f.date}</div>
+          <div className="text-sm text-muted-foreground mt-1">{f.category}</div>
 
           <div className="mt-5">
-            <HitlBadge decision={f.automationDecision} />
+            <HitlBadge decision={f.decision} />
             {!isNotPursuing && (
-              <p className="mt-2 text-xs text-muted-foreground max-w-lg">{f.escalationReason}</p>
+              <p className="mt-2 text-xs text-muted-foreground max-w-lg">{f.decisionReason}</p>
             )}
           </div>
 
           <div className="mt-6 grid grid-cols-3 gap-4">
-            <Stat label="Charge" value={`£${f.amount.toFixed(2)}`} />
+            <Stat label="Charge" value={`£${f.originalAmount.toFixed(2)}`} />
             <Stat
               label="Recoverable"
-              value={f.recoverable > 0 ? `£${f.recoverable.toFixed(2)}` : "—"}
-              accent={f.recoverable > 0}
+              value={f.recoverableAmount > 0 ? `£${f.recoverableAmount.toFixed(2)}` : "—"}
+              accent={f.recoverableAmount > 0}
             />
             <Stat
               label="Confidence"
-              value={`${f.probability}%`}
+              value={`${f.confidenceScore}%`}
               bar
-              barColor={f.probability >= 80 ? "bg-primary" : f.probability >= 60 ? "bg-warning" : "bg-muted-foreground/40"}
-              barPct={f.probability}
+              barColor={f.confidenceScore >= 80 ? "bg-primary" : f.confidenceScore >= 60 ? "bg-warning" : "bg-muted-foreground/40"}
+              barPct={f.confidenceScore}
             />
           </div>
         </div>
@@ -89,80 +88,31 @@ function CaseModal() {
         {/* Body */}
         <div className="p-6 md:p-8 space-y-6">
 
-          {/* AI Reasoning */}
-          <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-primary mb-2 font-medium">
-              <Sparkles className="h-3.5 w-3.5" /> AI reasoning
-              <span className="ml-auto text-[10px] text-muted-foreground font-normal normal-case tracking-normal">
-                via llmService · model: claude-sonnet-4-6
-              </span>
-            </div>
-            <p className="text-sm leading-relaxed">{f.llmReasoning.summary}</p>
-            <div className="mt-3 flex flex-wrap gap-2 text-xs">
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 font-medium ${
-                f.riskLevel === "Low"
-                  ? "border-primary/30 bg-primary/10 text-primary"
-                  : f.riskLevel === "Medium"
-                    ? "border-warning/30 bg-warning/10 text-warning"
-                    : "border-destructive/30 bg-destructive/10 text-destructive"
-              }`}>
-                Risk: {f.riskLevel}
-              </span>
-              <span className="inline-flex items-center gap-1 rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-muted-foreground font-medium">
-                {f.llmReasoning.riskJustification.slice(0, 80)}…
-              </span>
+          <div className="rounded-xl border border-border bg-background/40 p-4 text-sm">
+            <div className="font-medium mb-2">Evidence</div>
+            <ul className="list-disc ml-5 space-y-1">{f.evidence.map((e: string) => <li key={e}>{e}</li>)}</ul>
+          </div>
+          <div className="rounded-xl border border-border bg-background/40 p-4 text-sm">
+            <div className="text-xs text-primary mb-1">AI reasoning (Claude-ready mock)</div>
+            <div className="font-medium mb-1">Explanation</div>
+            {f.explanation}
+          </div>
+          <div className="rounded-xl border border-border bg-background/40 p-4 text-sm">
+            <div className="font-medium mb-1">Specter-style intelligence (mock)</div>
+            <div>{f.merchantIntelligence.refundPolicy}</div>
+            <div className="text-xs text-muted-foreground mt-2">
+              Dispute likelihood: {f.merchantIntelligence.disputeLikelihood} · Recovery rate: {f.merchantIntelligence.recoveryRate}%
             </div>
           </div>
 
-          {/* Merchant Intelligence */}
-          <div className="rounded-xl border border-border bg-background/40 p-4">
-            <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground mb-3 font-medium">
-              <TrendingUp className="h-3.5 w-3.5 text-primary" /> Merchant intelligence
-              <span className="ml-auto text-[10px] font-normal normal-case tracking-normal text-muted-foreground/60">
-                {f.merchantIntel.source}
-              </span>
-            </div>
-            <div className="grid sm:grid-cols-3 gap-3 text-sm">
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Dispute friendliness</div>
-                <div className={`font-semibold ${disputeFriendlinessColor}`}>
-                  {f.merchantIntel.disputeFriendliness}
-                </div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Avg recovery rate</div>
-                <div className="font-semibold">{f.merchantIntel.avgRecoveryRate}%</div>
-              </div>
-              <div>
-                <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Refund policy</div>
-                <div className="text-xs text-muted-foreground leading-snug">{f.merchantIntel.refundPolicy.slice(0, 60)}…</div>
-              </div>
-            </div>
-            {f.merchantIntel.knownPattern && (
-              <div className="mt-3 rounded-lg border border-border bg-background/30 px-3 py-2 text-xs text-muted-foreground">
-                <AlertTriangle className="h-3 w-3 inline mr-1 text-warning" />
-                {f.merchantIntel.knownPattern}
-              </div>
-            )}
-          </div>
-
-          <Block icon={Shield} title="Evidence summary">{f.evidence}</Block>
-          <Block icon={Brain} title="Why the agent flagged this">{f.reasoning}</Block>
-
-          {!isNotPursuing && (
-            <Block icon={FileText} title="Generated recovery message">
-              <div className="rounded-lg border border-border bg-background/40 p-4 text-sm leading-relaxed font-mono whitespace-pre-wrap">
-                {f.message}
-              </div>
-            </Block>
-          )}
+          {!isNotPursuing && <div className="text-xs text-muted-foreground">Recovery message generated by `llmService` during scan and action creation.</div>}
 
           {/* Audit trail */}
           <div>
             <div className="text-xs uppercase tracking-widest text-muted-foreground mb-2">Audit trail</div>
             <div className="rounded-lg border border-border overflow-hidden">
-              {f.audit.map((a, i) => {
-                const isHitl = a.event.includes("HITL");
+              {f.timeline.map((a: any, i: number) => {
+                const isHitl = a.eventType === "automation_decided";
                 return (
                   <div
                     key={i}
@@ -170,9 +120,9 @@ function CaseModal() {
                       isHitl ? "bg-warning/5" : "bg-background/30"
                     }`}
                   >
-                    <span className="text-xs text-muted-foreground tabular-nums w-20 shrink-0">{a.time}</span>
+                    <span className="text-xs text-muted-foreground tabular-nums w-20 shrink-0">{new Date(a.timestamp).toLocaleTimeString()}</span>
                     <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${isHitl ? "bg-warning" : "bg-primary"}`} />
-                    <span className={isHitl ? "text-warning font-medium" : ""}>{a.event}</span>
+                    <span className={isHitl ? "text-warning font-medium" : ""}>{a.eventType}</span>
                   </div>
                 );
               })}
@@ -197,20 +147,29 @@ function CaseModal() {
           ) : (
             <>
               <button
-                onClick={close}
+                onClick={async () => {
+                  await apiIgnoreOpportunity(f.id);
+                  close();
+                }}
                 className="inline-flex items-center gap-2 rounded-lg border border-border px-4 py-2 text-sm hover:bg-background/40"
               >
                 <EyeOff className="h-4 w-4" /> Ignore
               </button>
               <button
-                onClick={() => setRecovered(true)}
+                onClick={async () => {
+                  await apiMarkRecovered(f.id);
+                  setRecovered(true);
+                }}
                 className="inline-flex items-center gap-2 rounded-lg border border-primary/40 text-primary px-4 py-2 text-sm hover:bg-primary/10"
               >
                 <Check className="h-4 w-4" /> Mark as recovered
               </button>
               {isAutoReady && (
                 <button
-                  onClick={() => setSubmitted(true)}
+                  onClick={async () => {
+                    await apiSubmitOpportunity(f.id);
+                    setSubmitted(true);
+                  }}
                   className="inline-flex items-center gap-2 rounded-lg bg-gradient-primary text-primary-foreground px-4 py-2 text-sm font-semibold shadow-glow"
                 >
                   <Send className="h-4 w-4" /> Auto-send recovery request
@@ -218,7 +177,10 @@ function CaseModal() {
               )}
               {needsReview && (
                 <button
-                  onClick={() => setSubmitted(true)}
+                  onClick={async () => {
+                    await apiSubmitOpportunity(f.id);
+                    setSubmitted(true);
+                  }}
                   className="inline-flex items-center gap-2 rounded-lg bg-warning text-primary-foreground px-4 py-2 text-sm font-semibold"
                 >
                   <Send className="h-4 w-4" /> Approve and send
@@ -253,20 +215,3 @@ function Stat({
   );
 }
 
-function Block({
-  icon: Icon, title, children,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-muted-foreground mb-2">
-        <Icon className="h-3.5 w-3.5 text-primary" />
-        {title}
-      </div>
-      <div className="text-sm leading-relaxed">{children}</div>
-    </div>
-  );
-}

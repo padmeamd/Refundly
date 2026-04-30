@@ -1,86 +1,197 @@
-/**
- * recoveryScanService.ts
- *
- * Financial Intelligence engine responsible for:
- *   1. Ingesting raw transaction data
- *   2. Running detection rules per category
- *   3. Calculating confidence scores
- *   4. Applying HITL routing rules
- *   5. Generating structured Finding objects
- *
- * Architecture note: This is a frontend mock service.
- * In production, replace with POST /api/recovery/scan → Spring Boot / FastAPI.
- */
+import type { RawTransaction } from "./transactionService";
 
-import type { AutomationDecision, Finding } from "../mock-data";
+export type RecoveryCategory =
+  | "DUPLICATE_CHARGE"
+  | "UNUSED_SUBSCRIPTION"
+  | "HIDDEN_BANK_FEE"
+  | "CANCELLED_SERVICE_NO_REFUND"
+  | "LATE_DELIVERY_REFUND"
+  | "SUSPICIOUS_RECURRING";
 
-// ─── HITL Routing Rules ────────────────────────────────────────────────────────
-// These rules are the core of the "human-out-of-the-loop" decision engine.
+export type AutomationDecision = "AUTO_READY" | "NEEDS_APPROVAL" | "NOT_WORTH";
 
-export function applyHitlRules(
-  confidence: number,
-  recoverableAmount: number
-): AutomationDecision {
-  if (confidence < 60) return "NOT_WORTH_PURSUING";
-  if (confidence >= 80 && recoverableAmount <= 100) return "AUTO_READY";
-  // confidence >= 80 but amount > £100, OR confidence 60–79
-  return "NEEDS_HUMAN_REVIEW";
+export interface RecoveryOpportunity {
+  id: string;
+  category: RecoveryCategory;
+  merchant: string;
+  originalAmount: number;
+  recoverableAmount: number;
+  confidenceScore: number;
+  explanation: string;
+  evidence: string[];
+  transactionIds: string[];
+  decision: AutomationDecision;
+  decisionReason: string;
+  priorityScore: number;
+  status: "DETECTED" | "ACTION_CREATED" | "SUBMITTED" | "RECOVERED" | "IGNORED";
 }
 
-// ─── Detection Categories ─────────────────────────────────────────────────────
+export interface ScanSummary {
+  totalMoneyFound: number;
+  recoverableNow: number;
+  autoReadyAmount: number;
+  needsApprovalAmount: number;
+  ignoredAmount: number;
+  numberOfOpportunities: number;
+}
 
-export const DETECTION_RULES = [
-  {
-    category: "DUPLICATE_CHARGE",
-    description: "Identical amount + merchant + terminal ID within 60 seconds",
-    confidenceBoost: 0.15,
-  },
-  {
-    category: "UNUSED_SUBSCRIPTION",
-    description: "Recurring charge with zero engagement signals in past 90 days",
-    confidenceBoost: 0.05,
-  },
-  {
-    category: "HIDDEN_BANK_FEE",
-    description: "Overdraft fee with balance recovery within 24h + clean history",
-    confidenceBoost: 0.1,
-  },
-  {
-    category: "CANCELLED_SERVICE_NO_REFUND",
-    description: "Refundable fare/booking cancelled — no refund issued within SLA",
-    confidenceBoost: 0.2,
-  },
-  {
-    category: "LATE_DELIVERY_REFUND",
-    description: "SLA breach on guaranteed delivery — compensation not claimed",
-    confidenceBoost: 0.08,
-  },
-  {
-    category: "SUSPICIOUS_RECURRING_CHARGE",
-    description: "Recurring merchant descriptor unrecognised — no signup trail found",
-    confidenceBoost: 0.0,
-  },
-] as const;
+export function decideAutomation(opportunity: Pick<RecoveryOpportunity, "confidenceScore" | "recoverableAmount">): {
+  decision: AutomationDecision;
+  reason: string;
+} {
+  if (opportunity.confidenceScore >= 80 && opportunity.recoverableAmount <= 100) {
+    return { decision: "AUTO_READY", reason: "confidence >= 80 and recoverable amount <= 100" };
+  }
+  if (opportunity.confidenceScore >= 80 && opportunity.recoverableAmount > 100) {
+    return { decision: "NEEDS_APPROVAL", reason: "high confidence but high-value claim (>100) requires human sign-off" };
+  }
+  if (opportunity.confidenceScore >= 60) {
+    return { decision: "NEEDS_APPROVAL", reason: "medium confidence band (60-79) requires human review" };
+  }
+  return { decision: "NOT_WORTH", reason: "confidence below 60, expected recovery value too low" };
+}
 
-// ─── Recovery Stats ────────────────────────────────────────────────────────────
+export function runRecoveryScan(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  const opportunities: RecoveryOpportunity[] = [];
+  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  opportunities.push(...detectDuplicateCharges(sorted));
+  opportunities.push(...detectUnusedSubscriptions(sorted));
+  opportunities.push(...detectHiddenFees(sorted));
+  opportunities.push(...detectCancelledServiceNoRefund(sorted));
+  opportunities.push(...detectLateDeliveryRefunds(sorted));
+  opportunities.push(...detectSuspiciousRecurring(sorted));
 
-export function computeScanSummary(results: Finding[]) {
-  const actionable = results.filter((f) => f.automationDecision !== "NOT_WORTH_PURSUING");
-  const autoReady = actionable.filter((f) => f.automationDecision === "AUTO_READY");
-  const needsReview = actionable.filter((f) => f.automationDecision === "NEEDS_HUMAN_REVIEW");
+  return opportunities.sort((a, b) => b.priorityScore - a.priorityScore);
+}
 
+export function detectDuplicateCharges(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  const duplicateKeyed = new Map<string, RawTransaction[]>();
+  for (const tx of transactions) {
+    const key = `${tx.date}|${tx.merchant.toLowerCase()}|${tx.amount.toFixed(2)}|${tx.terminalId ?? "na"}`;
+    duplicateKeyed.set(key, [...(duplicateKeyed.get(key) ?? []), tx]);
+  }
+  const results: RecoveryOpportunity[] = [];
+  for (const group of duplicateKeyed.values()) {
+    if (group.length < 2) continue;
+    const recoverable = group[0].amount * (group.length - 1);
+    results.push(
+      createOpportunity("DUPLICATE_CHARGE", group[0].merchant, group.reduce((s, t) => s + t.amount, 0), recoverable, 94, [
+        `${group.length} matching transactions on ${group[0].date}`,
+        `Same amount ${group[0].currency} ${group[0].amount.toFixed(2)}`,
+        `Terminal ID match: ${group[0].terminalId ?? "n/a"}`,
+      ], group.map((g) => g.id), "Duplicate payment pattern with deterministic amount + merchant + terminal match."),
+    );
+  }
+  return results;
+}
+
+export function detectUnusedSubscriptions(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  const recurring = transactions.filter((t) => t.recurring && t.amount > 0 && t.merchant.toLowerCase().includes("fitflex"));
+  if (recurring.length < 2) return [];
+  const first = recurring[0];
+  return [
+    createOpportunity("UNUSED_SUBSCRIPTION", first.merchant, first.amount, first.amount, 78, [
+      `${recurring.length} monthly recurring charges`,
+      "No recent engagement signal (deterministic demo rule)",
+      "User can cancel and request unused period refund",
+    ], recurring.map((r) => r.id), "Subscription has recurring spend with low usage signal, eligible for cancellation + refund request."),
+  ];
+}
+
+export function detectHiddenFees(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  return transactions
+    .filter((tx) => tx.description.toLowerCase().includes("overdraft fee"))
+    .map((tx) =>
+      createOpportunity("HIDDEN_BANK_FEE", tx.merchant, tx.amount, tx.amount, 81, [
+        "Overdraft fee detected",
+        "First incident in period (mock deterministic rule)",
+        "Goodwill reversal likely for this amount",
+      ], [tx.id], "Fee reversal request is usually accepted for first-time overdraft fee patterns."),
+    );
+}
+
+export function detectCancelledServiceNoRefund(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  return transactions
+    .filter((tx) => tx.merchant.toLowerCase().includes("trainline") || tx.description.toLowerCase().includes("non-refundable"))
+    .map((tx) =>
+      tx.merchant.toLowerCase().includes("trainline")
+        ? createOpportunity("CANCELLED_SERVICE_NO_REFUND", tx.merchant, tx.amount, tx.amount, 88, [
+            "Cancelled service marker in merchant metadata",
+            "No refund transaction found after cancellation window",
+            "Fare class assumed refundable in demo dataset",
+          ], [tx.id], "Service cancellation appears refundable but was not returned automatically.")
+        : createOpportunity("CANCELLED_SERVICE_NO_REFUND", tx.merchant, tx.amount, 0, 42, [
+            "Non-refundable booking marker",
+            "Cancelled close to service date",
+            "Low recovery likelihood",
+          ], [tx.id], "Cancellation terms indicate no practical refund path."),
+    );
+}
+
+export function detectLateDeliveryRefunds(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  return transactions
+    .filter((tx) => tx.merchant.toLowerCase().includes("amazon"))
+    .map((tx) =>
+      createOpportunity("LATE_DELIVERY_REFUND", tx.merchant, tx.amount, 12, 72, [
+        "Guaranteed delivery date missed (mock fulfillment signal)",
+        "Compensation band modeled at 5-15 GBP",
+        "No claim previously filed",
+      ], [tx.id], "Late delivery compensation likely available but amount should be human-approved."),
+    );
+}
+
+export function detectSuspiciousRecurring(transactions: RawTransaction[]): RecoveryOpportunity[] {
+  const recurring = transactions.filter((t) => t.recurring && t.merchant.toLowerCase().includes("streamingplus"));
+  if (recurring.length < 2) return [];
+  return [
+    createOpportunity("SUSPICIOUS_RECURRING", recurring[0].merchant, recurring.reduce((s, t) => s + t.amount, 0), recurring[0].amount, 67, [
+      `${recurring.length} recurring charges detected`,
+      "Descriptor appears unrecognized",
+      "No signup proof in linked data sources (mocked)",
+    ], recurring.map((r) => r.id), "Recurring pattern appears unauthorized; cancellation and dispute should be reviewed."),
+  ];
+}
+
+export function computeSummary(opportunities: RecoveryOpportunity[]): ScanSummary {
   return {
-    totalScanned: 1284,
-    totalFound: results.reduce((s, f) => s + f.amount, 0),
-    recoverableNow: actionable.reduce((s, f) => s + f.recoverable, 0),
-    issuesDetected: actionable.length,
-    autoReadyCount: autoReady.length,
-    humanReviewCount: needsReview.length,
-    notWorthPursuingCount: results.filter((f) => f.automationDecision === "NOT_WORTH_PURSUING").length,
-    autoReadyValue: autoReady.reduce((s, f) => s + f.recoverable, 0),
-    humanReviewValue: needsReview.reduce((s, f) => s + f.recoverable, 0),
-    avgConfidence: Math.round(
-      actionable.reduce((s, f) => s + f.probability, 0) / (actionable.length || 1)
-    ),
+    totalMoneyFound: round2(opportunities.reduce((sum, o) => sum + o.originalAmount, 0)),
+    recoverableNow: round2(opportunities.reduce((sum, o) => sum + o.recoverableAmount, 0)),
+    autoReadyAmount: round2(opportunities.filter((o) => o.decision === "AUTO_READY").reduce((sum, o) => sum + o.recoverableAmount, 0)),
+    needsApprovalAmount: round2(opportunities.filter((o) => o.decision === "NEEDS_APPROVAL").reduce((sum, o) => sum + o.recoverableAmount, 0)),
+    ignoredAmount: round2(opportunities.filter((o) => o.decision === "NOT_WORTH").reduce((sum, o) => sum + o.originalAmount, 0)),
+    numberOfOpportunities: opportunities.length,
   };
+}
+
+function createOpportunity(
+  category: RecoveryCategory,
+  merchant: string,
+  originalAmount: number,
+  recoverableAmount: number,
+  confidenceScore: number,
+  evidence: string[],
+  transactionIds: string[],
+  explanation: string,
+): RecoveryOpportunity {
+  const decisionResult = decideAutomation({ confidenceScore, recoverableAmount });
+  const id = `opp-${category.toLowerCase()}-${transactionIds[0]}`;
+  return {
+    id,
+    category,
+    merchant,
+    originalAmount: round2(originalAmount),
+    recoverableAmount: round2(recoverableAmount),
+    confidenceScore,
+    explanation,
+    evidence,
+    transactionIds,
+    decision: decisionResult.decision,
+    decisionReason: decisionResult.reason,
+    priorityScore: Math.round(recoverableAmount * (confidenceScore / 100)),
+    status: "DETECTED",
+  };
+}
+
+function round2(value: number): number {
+  return Math.round(value * 100) / 100;
 }

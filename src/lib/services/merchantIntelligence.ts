@@ -1,51 +1,58 @@
-/**
- * merchantIntelligence.ts
- *
- * Merchant refund policy & dispute intelligence layer.
- * Modelled after Specter's merchant data capabilities.
- *
- * SPECTER: Each function tagged with // SPECTER: is a candidate for
- *          replacement with a real Specter API call.
- *          Endpoint pattern: GET /specter/merchant/{name}/intelligence
- */
-
-import type { MerchantIntel } from "../mock-data";
-import { findings } from "../mock-data";
-
-// ─── Merchant Database ─────────────────────────────────────────────────────────
-// SPECTER: Replace this static map with Specter merchant intelligence API
-
-const merchantDb: Record<string, MerchantIntel> = Object.fromEntries(
-  findings.map((f) => [f.merchant.toLowerCase(), f.merchantIntel])
-);
-
-// ─── Public API ────────────────────────────────────────────────────────────────
-
-// SPECTER: Replace with real API call
-export function getMerchantIntel(merchantName: string): MerchantIntel | null {
-  return merchantDb[merchantName.toLowerCase()] ?? null;
+export interface MerchantIntelligence {
+  label: "Specter-style intelligence (mock)";
+  refundPolicy: string;
+  disputeLikelihood: "HIGH" | "MEDIUM" | "LOW";
+  recoveryRate: number;
 }
 
-// SPECTER: Replace with real API call
-export function getDisputeFriendlinessLabel(
-  level: "High" | "Medium" | "Low"
-): { label: string; colour: string } {
-  return {
-    High: { label: "Dispute-friendly", colour: "text-primary" },
-    Medium: { label: "Moderate — may require escalation", colour: "text-warning" },
-    Low: { label: "Dispute-resistant", colour: "text-destructive" },
-  }[level];
-}
+const db: Record<string, MerchantIntelligence> = {
+  "pret a manger": {
+    label: "Specter-style intelligence (mock)",
+    refundPolicy: "Duplicate card-present transactions are typically reversed in 3-5 business days.",
+    disputeLikelihood: "HIGH",
+    recoveryRate: 96,
+  },
+  fitflex: {
+    label: "Specter-style intelligence (mock)",
+    refundPolicy: "Unused subscription refunds handled by membership support with proof of inactivity.",
+    disputeLikelihood: "MEDIUM",
+    recoveryRate: 71,
+  },
+  amazon: {
+    label: "Specter-style intelligence (mock)",
+    refundPolicy: "Prime late-delivery claims are usually compensated with account credit.",
+    disputeLikelihood: "HIGH",
+    recoveryRate: 83,
+  },
+  metrobank: {
+    label: "Specter-style intelligence (mock)",
+    refundPolicy: "First overdraft incidents may be waived as goodwill.",
+    disputeLikelihood: "HIGH",
+    recoveryRate: 88,
+  },
+  trainline: {
+    label: "Specter-style intelligence (mock)",
+    refundPolicy: "Refundable fare cancellations can be claimed in-app with booking reference.",
+    disputeLikelihood: "HIGH",
+    recoveryRate: 94,
+  },
+  streamingplus: {
+    label: "Specter-style intelligence (mock)",
+    refundPolicy: "Recurring subscription disputes may require bank chargeback.",
+    disputeLikelihood: "LOW",
+    recoveryRate: 58,
+  },
+};
 
-// SPECTER: Replace with real API call
-export function getAllMerchantInsights() {
-  return findings
-    .filter((f) => f.automationDecision !== "NOT_WORTH_PURSUING")
-    .map((f) => ({
-      merchant: f.merchant,
-      avgRecoveryRate: f.merchantIntel.avgRecoveryRate,
-      disputeFriendliness: f.merchantIntel.disputeFriendliness,
-      refundPolicy: f.merchantIntel.refundPolicy,
-    }))
-    .sort((a, b) => b.avgRecoveryRate - a.avgRecoveryRate);
+export function getMerchantIntelligence(merchantName: string): MerchantIntelligence {
+  const key = merchantName.toLowerCase();
+  const hit = Object.keys(db).find((k) => key.includes(k));
+  return hit
+    ? db[hit]
+    : {
+        label: "Specter-style intelligence (mock)",
+        refundPolicy: "Standard refund request path with manual review.",
+        disputeLikelihood: "MEDIUM",
+        recoveryRate: 62,
+      };
 }

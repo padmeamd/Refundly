@@ -1,114 +1,68 @@
-# Refundly — Autonomous Financial Recovery Agent
+# Refundly - Autonomous Financial Recovery Agent
 
-> **Cursor × Briefcase FinTech London Hackathon**
-> Track: **Financial Intelligence** · Theme: **Human-out-of-the-loop in FinTech**
+Refundly scans transactions, finds lost money, decides whether to act automatically or request approval, prepares actions, and logs everything in an audit trail.
 
----
+## Problem
 
-## What is it?
+People lose money to duplicate charges, hidden fees, unused subscriptions, and missed refunds, but recovery work is manual and slow.
 
-Refundly is an autonomous AI agent that scans your bank transaction history, detects lost money, decides what it can recover automatically vs what needs your sign-off, generates ready-to-send recovery messages, and seals every decision in a cryptographic audit trail.
+## Solution
 
-**One click. £420 found. £180 ready to recover.**
+Refundly provides a real workflow:
+`scan -> decide -> act -> audit`
 
----
+## Human-out-of-the-loop logic
 
-## The problem
+- confidence >= 80 and recoverable <= 100 -> AUTO_READY
+- confidence >= 80 and recoverable > 100 -> NEEDS_APPROVAL
+- confidence 60-79 -> NEEDS_APPROVAL
+- confidence < 60 -> NOT_WORTH
 
-Every month, consumers silently lose money to:
-- Duplicate card charges from terminal glitches
-- Bank fees charged unfairly and never challenged
-- Subscriptions paid for services never used
-- Cancelled bookings with refunds never claimed
-- Late delivery guarantees never invoked
-- Suspicious recurring charges from unrecognised merchants
+UI labels:
+- Auto-send allowed
+- Human review required
+- Low confidence
 
-Chasing these requires knowing your rights, writing the right letters, and navigating merchant dispute processes — work almost nobody does.
+## Architecture
 
----
+```text
+src/lib/api/apiClient.ts
+  GET /transactions
+  POST /scan
+  GET /opportunities
+  POST /opportunity/{id}/submit
 
-## The solution
-
-Refundly removes the human from the loop for routine, high-confidence recovery actions. It keeps the human in the loop for complex, high-value, or ambiguous cases.
-
-```
-1,284 transactions scanned
-       ↓
-  7 issues detected
-       ↓
-  HITL routing engine
-  ┌──────────────────────────────────────────────┐
-  │  conf >= 80% + amount <= £100  → AUTO_READY  │  3 cases · £98.60
-  │  conf >= 80% + amount >  £100  → NEEDS_REVIEW │
-  │  conf 60–79%                   → NEEDS_REVIEW │  3 cases · £81.98
-  │  conf < 60%                    → NOT_PURSUING │  1 case
-  └──────────────────────────────────────────────┘
-       ↓
-  Recovery messages generated
-  Merchant intelligence applied (Specter)
-  Audit trail sealed
+Services:
+- transactionService.ts
+- recoveryScanService.ts
+- actionService.ts
+- auditService.ts
+- llmService.ts
+- merchantIntelligence.ts
 ```
 
----
+## Demo flow (90 seconds)
 
-## Rubric alignment
+1. Click **Run 90-sec demo**
+2. Transactions load and scan runs
+3. Findings are generated from transactions
+4. Highest-value case is highlighted
+5. Decision reason + confidence are shown
+6. One auto-ready action is submitted
+7. Report shows summary metrics and audit timeline
 
-| Criterion | Implementation |
-|---|---|
-| **Concrete Workflow Value** (2pts) | Replaces the human task of reviewing transactions, researching refund rights, writing dispute letters, and tracking outcomes |
-| **Financial Intelligence** (2pts) | 6 finding categories, Bayesian confidence scoring, Specter-style merchant intelligence (dispute-friendliness, avg recovery rate, known patterns) |
-| **Human-in-the-loop** (1pt) | Explicit confidence + amount thresholds. Every case labelled: "Auto-send allowed" / "Human review required" / "Low confidence — not submitted". HITL routing step visible in scan animation. |
-| **Technical Execution** (1pt) | TanStack Start SSR, clean service layer (recoveryScanService, llmService, merchantIntelligence), modular architecture ready for real APIs |
-| **Demo Clarity** (1pt) | "90-sec demo" button runs the full automated flow |
+## Why this fits the hackathon rubric
 
----
+- Human-out-of-the-loop: explicit autonomous routing with thresholds
+- Financial Intelligence: transaction interpretation + confidence scoring
+- Technical execution: clean service + API layer architecture
+- Demo clarity: deterministic and stable one-button run
 
-## Human-in-the-loop rules
-
-```ts
-// src/lib/services/recoveryScanService.ts
-function applyHitlRules(confidence: number, recoverable: number): AutomationDecision {
-  if (confidence < 60)                        return "NOT_WORTH_PURSUING";
-  if (confidence >= 80 && recoverable <= 100) return "AUTO_READY";
-  return "NEEDS_HUMAN_REVIEW"; // conf 60-79 OR high-value amount
-}
-```
-
----
-
-## Tech stack
-
-| Layer | Technology |
-|---|---|
-| Framework | TanStack Start (SSR + file-based routing) |
-| Styling | Tailwind CSS v4, custom design tokens |
-| UI | Radix UI primitives, Lucide icons |
-| Runtime | Cloudflare Workers (Wrangler) |
-| Language | TypeScript |
-
----
-
-## Services architecture
-
-```
-src/lib/services/
-├── recoveryScanService.ts    # HITL routing engine, detection rules, confidence scoring
-├── llmService.ts             # LLM abstraction (mock → Claude/OpenAI, one flag to enable)
-└── merchantIntelligence.ts   # Specter-style merchant data (tagged for API replacement)
-```
-
-**To enable real Claude calls:** Set `LLM_ENABLED = true` in `llmService.ts` and add `VITE_ANTHROPIC_API_KEY` to `.env`.
-
-**To enable Specter:** Replace `// SPECTER:` tagged functions in `merchantIntelligence.ts` with real API calls.
-
----
-
-## How to run
+## Run locally
 
 ```bash
 npm install
 npm run dev
-# → http://localhost:3000
 ```
 
 **Deploy:**
