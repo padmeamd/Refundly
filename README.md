@@ -154,4 +154,4 @@ wrangler deploy
 
 ---
 
-MIT — Cursor × Briefcase FinTech London Hackathon 2026
+Cursor × Briefcase FinTech London Hackathon 2026
